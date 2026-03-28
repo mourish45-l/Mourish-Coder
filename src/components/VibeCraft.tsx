@@ -66,6 +66,29 @@ export default function VibeCraft() {
 
   const [previewContent, setPreviewContent] = useState('');
   const [previewKey, setPreviewKey] = useState(0);
+  const prevSessionId = useRef<string | null>(null);
+
+  const getFullHtml = (result: GeneratedCode) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+          <style>
+            ${result.css || ''}
+            body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+            h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', sans-serif; }
+          </style>
+        </head>
+        <body>
+          ${result.html}
+        </body>
+      </html>
+    `;
+  };
 
   // Auth Listener
   useEffect(() => {
@@ -170,7 +193,12 @@ export default function VibeCraft() {
           setCurrentQuestionIndex(current.currentQuestionIndex);
           setGeneratedResult(current.generatedResult);
           setChatHistory(current.chatHistory);
-          setPreviewContent(current.previewContent);
+          
+          if (!current.previewContent && current.generatedResult) {
+            setPreviewContent(getFullHtml(current.generatedResult));
+          } else {
+            setPreviewContent(current.previewContent);
+          }
         }
       }
     }
@@ -178,7 +206,22 @@ export default function VibeCraft() {
 
   // Sync current state to sessions array
   useEffect(() => {
-    if (!currentSessionId) return;
+    if (!currentSessionId) {
+      prevSessionId.current = null;
+      return;
+    }
+
+    // Guard against race conditions during session switch
+    if (prevSessionId.current !== currentSessionId) {
+      prevSessionId.current = currentSessionId;
+      return;
+    }
+
+    // Guard: Don't overwrite a non-empty session with empty local state (prevents wipeout on initial load)
+    const session = sessions.find(s => s.id === currentSessionId);
+    if (session && (session.step !== 'prompt' || session.prompt !== '') && step === 'prompt' && !prompt) {
+       return;
+    }
 
     setSessions(prev => {
       const updated = prev.map(s => {
@@ -200,7 +243,7 @@ export default function VibeCraft() {
       });
       return updated;
     });
-  }, [step, prompt, questions, answers, currentQuestionIndex, generatedResult, chatHistory, previewContent]);
+  }, [currentSessionId, step, prompt, questions, answers, currentQuestionIndex, generatedResult, chatHistory, previewContent]);
 
   // Save to Persistence Layer
   useEffect(() => {
@@ -219,6 +262,28 @@ export default function VibeCraft() {
       }
     }
   }, [sessions, currentSessionId, user]);
+
+  // Auto-load session data when currentSessionId or sessions change (for Firebase sync/initial load)
+  useEffect(() => {
+    if (!currentSessionId || sessions.length === 0) return;
+    
+    const session = sessions.find(s => s.id === currentSessionId);
+    if (session && step === 'prompt' && !prompt && (session.step !== 'prompt' || session.prompt !== '')) {
+      setStep(session.step);
+      setPrompt(session.prompt);
+      setQuestions(session.questions);
+      setAnswers(session.answers);
+      setCurrentQuestionIndex(session.currentQuestionIndex);
+      setGeneratedResult(session.generatedResult);
+      setChatHistory(session.chatHistory);
+      
+      if (!session.previewContent && session.generatedResult) {
+        setPreviewContent(getFullHtml(session.generatedResult));
+      } else {
+        setPreviewContent(session.previewContent);
+      }
+    }
+  }, [currentSessionId, sessions, step, prompt]);
 
   const createNewSession = () => {
     const newId = Math.random().toString(36).substring(7);
@@ -263,7 +328,13 @@ export default function VibeCraft() {
     setCurrentQuestionIndex(session.currentQuestionIndex);
     setGeneratedResult(session.generatedResult);
     setChatHistory(session.chatHistory);
-    setPreviewContent(session.previewContent);
+    
+    if (!session.previewContent && session.generatedResult) {
+      setPreviewContent(getFullHtml(session.generatedResult));
+    } else {
+      setPreviewContent(session.previewContent);
+    }
+    
     setIsHistoryOpen(false);
   };
 
@@ -331,8 +402,13 @@ export default function VibeCraft() {
   const handleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
+      if (error.code === 'auth/unauthorized-domain') {
+        setError("Login failed: This domain is not authorized in Firebase. Please add this URL to your Firebase Console's Authorized Domains.");
+      } else {
+        setError(`Login failed: ${error.message}`);
+      }
     }
   };
 
@@ -343,28 +419,6 @@ export default function VibeCraft() {
     } catch (error) {
       console.error("Logout failed", error);
     }
-  };
-
-  const getFullHtml = (result: GeneratedCode) => {
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-          <style>
-            ${result.css || ''}
-            body { font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
-            h1, h2, h3, h4, h5, h6 { font-family: 'Space Grotesk', sans-serif; }
-          </style>
-        </head>
-        <body>
-          ${result.html}
-        </body>
-      </html>
-    `;
   };
 
   const handleStart = async () => {
