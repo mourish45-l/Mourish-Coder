@@ -1,0 +1,72 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* MD3-like color palette */
+  --color-md-primary: #6750A4;
+  --color-md-on-primary: #FFFFFF;
+  --color-md-primary-container: #EADDFF;
+  --color-md-on-primary-container: #21005D;
+  
+  --color-md-secondary: #625B71;
+  --color-md-on-secondary: #FFFFFF;
+  --color-md-secondary-container: #E8DEF8;
+  --color-md-on-secondary-container: #1D192B;
+
+  --color-md-tertiary: #7D5260;
+  --color-md-on-tertiary: #FFFFFF;
+  --color-md-tertiary-container: #FFD8E4;
+  --color-md-on-tertiary-container: #31111D;
+
+  --color-md-error: #B3261E;
+  --color-md-on-error: #FFFFFF;
+  --color-md-error-container: #F9DEDC;
+  --color-md-on-error-container: #410E0B;
+
+  --color-md-surface: #FEF7FF;
+  --color-md-on-surface: #1D1B20;
+  --color-md-surface-variant: #E7E0EB;
+  --color-md-on-surface-variant: #49454F;
+  --color-md-outline: #79747E;
+}
+
+@layer base {
+  body {
+    @apply bg-md-surface text-md-on-surface font-sans;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+}
+
+.md-card {
+  @apply bg-md-surface-variant/30 rounded-3xl p-6 border border-md-outline/10 backdrop-blur-sm transition-all duration-300;
+}
+
+.md-button-primary {
+  @apply bg-md-primary text-md-on-primary px-6 py-3 rounded-full font-medium hover:shadow-lg active:scale-95 transition-all;
+}
+
+.md-button-tonal {
+  @apply bg-md-secondary-container text-md-on-secondary-container px-6 py-3 rounded-full font-medium hover:shadow-md active:scale-95 transition-all;
+}
+
+.md-input {
+  @apply bg-md-surface-variant/50 border-b-2 border-md-outline px-4 py-3 rounded-t-xl focus:border-md-primary focus:outline-none transition-all w-full;
+}
+
+/* Custom scrollbar for MD3 feel */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-md-outline/20 rounded-full hover:bg-md-outline/40;
+}
