@@ -17,7 +17,8 @@ import {
   Trash2,
   LogIn,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  AlertCircle
 } from 'lucide-react';
 import { getClarifyingQuestions, generateVibeCode, refineVibeCode, getRefinementSuggestions, GeneratedCode } from '../lib/gemini';
 import { auth, db, googleProvider } from '../firebase';
@@ -53,6 +54,7 @@ export default function VibeCraft() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [generatedResult, setGeneratedResult] = useState<GeneratedCode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview');
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -389,12 +391,14 @@ export default function VibeCraft() {
     }
 
     setIsLoading(true);
+    setError(null);
     try {
       const qs = await getClarifyingQuestions(prompt);
       setQuestions(qs);
       setStep('questions');
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to get clarifying questions. Please check your API key or try again.');
     } finally {
       setIsLoading(false);
     }
@@ -414,6 +418,7 @@ export default function VibeCraft() {
   const handleGenerate = async () => {
     setStep('generating');
     setIsLoading(true);
+    setError(null);
     try {
       const result = await generateVibeCode(prompt, answers);
       setGeneratedResult(result);
@@ -426,8 +431,10 @@ export default function VibeCraft() {
       // Fetch suggestions
       const sugs = await getRefinementSuggestions(result);
       setSuggestions(sugs);
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
+      setError('Generation failed. The AI might be busy or there was a connection issue.');
+      setStep('prompt'); // Go back to prompt on failure
     } finally {
       setIsLoading(false);
     }
@@ -574,6 +581,18 @@ export default function VibeCraft() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-md-tertiary/10 blur-[120px] rounded-full" />
       </div>
 
+      {!process.env.GEMINI_API_KEY && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-sm flex items-center gap-3 shadow-xl">
+            <AlertCircle size={20} className="shrink-0" />
+            <div>
+              <p className="font-bold">Gemini API Key Missing</p>
+              <p className="opacity-80">Please add your GEMINI_API_KEY to the environment variables to enable AI generation.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="fixed top-0 left-0 right-0 p-6 flex justify-between items-center z-50">
         <div className="flex items-center gap-4">
           <button 
@@ -646,9 +665,12 @@ export default function VibeCraft() {
               <div className="w-full relative group">
                 <textarea
                   value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  onChange={(e) => {
+                    setPrompt(e.target.value);
+                    setError(null);
+                  }}
                   placeholder="A futuristic dashboard for a space station with neon accents and real-time data..."
-                  className="md-input h-40 text-xl resize-none pr-16 pt-6"
+                  className={`md-input h-40 text-xl resize-none pr-16 pt-6 ${error ? 'border-red-500' : ''}`}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && e.metaKey) handleStart();
                   }}
@@ -664,6 +686,13 @@ export default function VibeCraft() {
                   CMD + ENTER to start
                 </div>
               </div>
+
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm flex items-center gap-3 animate-shake">
+                  <RefreshCw size={16} className="shrink-0" />
+                  {error}
+                </div>
+              )}
 
               <div className="flex flex-wrap justify-center gap-3">
                 {['SaaS Landing Page', 'Crypto Dashboard', 'Portfolio Gallery', 'Music Player'].map(tag => (

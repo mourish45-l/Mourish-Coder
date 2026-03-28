@@ -1,6 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+function getAI() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is missing. Please add it to your environment variables in the Settings menu.");
+  }
+  return new GoogleGenAI({ apiKey });
+}
 
 export interface ClarifyingQuestions {
   questions: string[];
@@ -13,6 +19,7 @@ export interface GeneratedCode {
 }
 
 export async function getClarifyingQuestions(prompt: string): Promise<string[]> {
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `The user wants to generate a website or web app with the following prompt: "${prompt}". 
@@ -48,10 +55,11 @@ export async function getClarifyingQuestions(prompt: string): Promise<string[]> 
 }
 
 export async function generateVibeCode(prompt: string, answers: Record<string, string>): Promise<GeneratedCode> {
+  const ai = getAI();
   const context = Object.entries(answers).map(([q, a]) => `Q: ${q}\nA: ${a}`).join("\n");
   
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-3-flash-preview",
     contents: `User Prompt: ${prompt}
     Clarifications:
     ${context}
@@ -93,10 +101,11 @@ export async function generateVibeCode(prompt: string, answers: Record<string, s
 }
 
 export async function refineVibeCode(previousCode: GeneratedCode, changeRequest: string, history: { role: 'user' | 'model', text: string }[]): Promise<GeneratedCode> {
+  const ai = getAI();
   const chatContext = history.map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join("\n");
-
+  
   const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-3-flash-preview",
     contents: `Previous Code:
     HTML: ${previousCode.html}
     CSS: ${previousCode.css}
@@ -131,7 +140,9 @@ export async function refineVibeCode(previousCode: GeneratedCode, changeRequest:
 }
 
 export async function getRefinementSuggestions(code: GeneratedCode): Promise<string[]> {
-  const response = await ai.models.generateContent({
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: `The following code was generated for a website:
     HTML: ${code.html}
@@ -157,11 +168,10 @@ export async function getRefinementSuggestions(code: GeneratedCode): Promise<str
     }
   });
 
-  try {
     const data = JSON.parse(response.text || '{"suggestions": []}');
     return data.suggestions;
   } catch (e) {
-    console.error("Failed to parse suggestions", e);
+    console.error("Failed to get refinement suggestions", e);
     return ["Add a dark mode toggle", "Improve mobile responsiveness", "Add more interactive hover states"];
   }
 }
